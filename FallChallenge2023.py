@@ -32,9 +32,17 @@ class Drone:
         self.y = drone_y
         self.emergency = emergency
         self.battery = battery
+        self.blips = {}
 
     def __str__(self):
         return f'ID:{self}, ({self.x}, {self.y}), E:{emergency}, B:{self.battery}'
+
+    def addBlip(self, creature_id, radar):
+        if creature_id in self.blips:
+            self.blips[creature_id] = self.blips[creature_id].append(radar)
+        else:
+            self.blips[creature_id] = [radar]
+        print(f'D:{self}, {self.blips}', file=sys.stderr, flush=True)
 
 
 def creatures_in_big_light(d, target_x, target_y):
@@ -44,6 +52,7 @@ def creatures_in_big_light(d, target_x, target_y):
         future_y = d.y-SINKING_IF_MOTOR_OFF
     else:
         distance = math.sqrt((d.x - target_x)**2 + (d.y - target_y)**2)
+        if distance == 0: distance = 1
         future_x = d.x + (target_x - d.x) * MAX_MOVEMENT/distance
         future_y = d.y + (target_y - d.y) * MAX_MOVEMENT/distance
     print(f'Predicted pos: {future_x}, {future_y}', file=sys.stderr, flush=True)
@@ -54,6 +63,9 @@ def creatures_in_big_light(d, target_x, target_y):
             return "1"
     return "0"
 
+def light(d):
+
+
 
 def horizontal_target(d, current_target):
     print(f"pos: {d.x} target: {current_target}", file=sys.stderr, flush=True)
@@ -62,16 +74,10 @@ def horizontal_target(d, current_target):
     return current_target
 
 
-creature_count = int(input())
-creatures = {}
-for i in range(creature_count):
-    creature_id, color, _type = [int(j) for j in input().split()]
-    creature = Creature(creature_id, color, _type)
-    creatures[creature_id] = creature
-
 # Constants
 MAP_MAX_X = 9999
 MAP_MAX_Y = 9999
+SURFACE_Y = 500
 MAP_ZONE_Y = 2500
 MAX_MOVEMENT = 600
 SINKING_IF_MOTOR_OFF = 300
@@ -82,12 +88,20 @@ BATTERY_RECHARGE = 1
 BATTERY_DRAIN_WITH_LIGHT = 5
 target_y = ""
 
+# Initialization Input
+creature_count = int(input())
+creatures = {}
+for i in range(creature_count):
+    creature_id, color, _type = [int(j) for j in input().split()]
+    creature = Creature(creature_id, color, _type)
+    creatures[creature_id] = creature
+
 # game loop
 while True:
     my_score = int(input())
     foe_score = int(input())
 
-    my_scan_count = int(input())
+    my_scan_count = int(input()) # Amount of SAVED scans
     my_scanned_creatures = {}
     for i in range(my_scan_count):
         creature_id = int(input())
@@ -113,7 +127,7 @@ while True:
         drone = Drone(drone_id, drone_x, drone_y, emergency, battery)
         foe_drones[drone_id] = drone
 
-    drone_scan_count = int(input())
+    drone_scan_count = int(input()) # Scans currently within a drone
     drone_scans = {}
     for i in range(drone_scan_count):
         drone_id, creature_id = [int(j) for j in input().split()]
@@ -132,16 +146,16 @@ while True:
         drone_id = int(inputs[0])
         creature_id = int(inputs[1])
         radar = inputs[2]
+        my_drones[drone_id].addBlip(creature_id, radar)
 
-    for i in range(my_drone_count):
+    for d in my_drones.values():
 
         # Write an action using print
         # To debug: print("Debug messages...", file=sys.stderr, flush=True)
         # MOVE <x> <y> <light (1|0)> | WAIT <light (1|0)>
-        d = my_drones[i]
         print(d.battery, file=sys.stderr, flush=True)
 
-        if d.y == 500:  # Starting y
+        if d.y == SURFACE_Y and my_scan_count == 0:  # Starting y
             target_x_changed = 0
             target_x = 2000 if d.x < 5000 else 8000
             target_y = 4500
