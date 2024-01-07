@@ -33,16 +33,20 @@ class Drone:
         self.emergency = emergency
         self.battery = battery
         self.blips = {}
+        self.currentScans = []
 
     def __str__(self):
-        return f'ID:{self}, ({self.x}, {self.y}), E:{emergency}, B:{self.battery}'
+        return f'ID:{self.drone_id}, ({self.x}, {self.y}), E:{emergency}, B:{self.battery}'
 
-    def addBlip(self, creature_id, radar):
+    def add_blip(self, creature_id, radar):
         if creature_id in self.blips:
             self.blips[creature_id] = self.blips[creature_id].append(radar)
         else:
             self.blips[creature_id] = [radar]
         print(f'D:{self}, {self.blips}', file=sys.stderr, flush=True)
+
+    def add_scan(self, creature_id):
+        self.currentScans.append(creature_id)
 
 
 def creatures_in_big_light(d, target_x, target_y):
@@ -63,8 +67,12 @@ def creatures_in_big_light(d, target_x, target_y):
             return "1"
     return "0"
 
-def light(d):
 
+def light(d, target_y):
+    if target_y<8000 or d.y > 5000:
+        return "1" if turn_counter % 3 else "0"
+    else:
+        return "0"
 
 
 def horizontal_target(d, current_target):
@@ -87,6 +95,7 @@ BATTERY_MAX = 30
 BATTERY_RECHARGE = 1
 BATTERY_DRAIN_WITH_LIGHT = 5
 target_y = ""
+turn_counter = 0
 
 # Initialization Input
 creature_count = int(input())
@@ -98,6 +107,7 @@ for i in range(creature_count):
 
 # game loop
 while True:
+    turn_counter += 1
     my_score = int(input())
     foe_score = int(input())
 
@@ -128,10 +138,12 @@ while True:
         foe_drones[drone_id] = drone
 
     drone_scan_count = int(input()) # Scans currently within a drone
-    drone_scans = {}
     for i in range(drone_scan_count):
         drone_id, creature_id = [int(j) for j in input().split()]
-        drone_scans[drone_id] = creatures[creature_id]
+        if drone_id in my_drones:
+            my_drones[drone_id].add_scan(creatures[creature_id])
+        else:
+            foe_drones[drone_id].add_scan(creatures[creature_id])
 
     visible_creature_count = int(input())
     visible_creatures = {}
@@ -146,7 +158,7 @@ while True:
         drone_id = int(inputs[0])
         creature_id = int(inputs[1])
         radar = inputs[2]
-        my_drones[drone_id].addBlip(creature_id, radar)
+        my_drones[drone_id].add_blip(creature_id, radar)
 
     for d in my_drones.values():
 
@@ -155,12 +167,13 @@ while True:
         # MOVE <x> <y> <light (1|0)> | WAIT <light (1|0)>
         print(d.battery, file=sys.stderr, flush=True)
 
-        if d.y == SURFACE_Y and my_scan_count == 0:  # Starting y
+        if d.y == SURFACE_Y:    # Starting y
             target_x_changed = 0
             target_x = 2000 if d.x < 5000 else 8000
-            target_y = 4500
+            target_y = 4500 if my_scan_count == 0 else 8750
+
         if d.y < target_y:
-            print(f"MOVE {target_x} {target_y} {creatures_in_big_light(d, target_x, target_y)}")
+            print(f"MOVE {target_x} {target_y} {light(d, target_y)}")
         elif d.y == target_y:
             if d.x == target_x:
                 if target_x_changed == 0:
@@ -168,8 +181,9 @@ while True:
                     target_x_changed = 1
                 else:
                     target_x_changed = 0
-                    target_y = 8000
-            print(f"MOVE {target_x} {target_y} {creatures_in_big_light(d, target_x, target_y)}")
-        elif len(my_scanned_creatures) < 12:
-            print(f"MOVE {horizontal_target(d, target_x)} 8750 {creatures_in_big_light(d)}")
-        else: print("WAIT 1")
+                    target_y = SURFACE_Y
+            print(f"MOVE {target_x} {target_y} {light(d, target_y)}")
+        elif d.y > target_y:
+            print(f"MOVE {target_x} {target_y} 0")
+        else:
+            print("WAIT 1")
