@@ -35,16 +35,16 @@ class Drone:
         self.blips = {}
         self.currentScans = []
         self.role = ""
+        self.target_x = 0
+        self.target_y = 0
+        self.target_x_changed = 0
 
     def __str__(self):
         return f'ID:{self.drone_id}, ({self.x}, {self.y}), E:{emergency}, B:{self.battery}'
 
     def add_blip(self, creature_id, radar):
-        if creature_id in self.blips:
-            self.blips[creature_id] = self.blips[creature_id].append(radar)
-        else:
-            self.blips[creature_id] = [radar]
-        print(f'D:{self}, {self.blips}', file=sys.stderr, flush=True)
+        self.blips[creature_id] = [radar]
+
 
     def add_scan(self, creature_id):
         self.currentScans.append(creature_id)
@@ -69,9 +69,9 @@ def creatures_in_big_light(d, target_x, target_y):
     return "0"
 
 
-def light(d, target_y):
-    if target_y<8000 or d.y > 5000:
-        return "1" if not turn_counter % 3 else "0"
+def light(d):
+    if d.y > 2000 and not d.target_y == SURFACE_Y:
+        return "1" if not turn_counter % 4 else "0"
     else:
         return "0"
 
@@ -95,7 +95,6 @@ SCAN_RANGE_WITH_LIGHT = 2000
 BATTERY_MAX = 30
 BATTERY_RECHARGE = 1
 BATTERY_DRAIN_WITH_LIGHT = 5
-target_y = ""
 turn_counter = 0
 
 # Initialization Input
@@ -124,17 +123,23 @@ while True:
         creature_id = int(input())
         foe_scanned_creatures[creature_id] = creatures[creature_id]
 
-    all_drones = []
     my_drone_count = int(input())
-    my_drones = {}
     for i in range(my_drone_count):
         drone_id, drone_x, drone_y, emergency, battery = [int(j) for j in input().split()]
-        drone = Drone(drone_id, drone_x, drone_y, emergency, battery)
-        my_drones[drone_id] = drone
-        all_drones[drone_id] = drone
-    if turn_counter == 1:
-        for d in my_drones.values():
-            d.role = "righty" if d.x == max([dr.x for dr in my_drones.values()]) else "lefty" # Drone with higher x goes right
+        if turn_counter == 1:
+            if i == 0:
+                my_drones = {}
+            drone = Drone(drone_id, drone_x, drone_y, emergency, battery)
+            my_drones[drone_id] = drone
+            # all_drones[drone_id] = drone
+            for d in my_drones.values():
+                d.role = "righty" if d.x == max([dr.x for dr in my_drones.values()]) else "lefty" # Drone with higher x goes right
+        else:
+            drone = my_drones[drone_id]
+            drone.x = drone_x
+            drone.y = drone_y
+            drone.emergency = emergency
+            drone.battery = battery
 
     foe_drone_count = int(input())
     foe_drones = {}
@@ -142,7 +147,7 @@ while True:
         drone_id, drone_x, drone_y, emergency, battery = [int(j) for j in input().split()]
         drone = Drone(drone_id, drone_x, drone_y, emergency, battery)
         foe_drones[drone_id] = drone
-        all_drones[drone_id] = drone
+        #all_drones[drone_id] = drone
 
     drone_scan_count = int(input()) # Scans currently within a drone
     for i in range(drone_scan_count):
@@ -171,27 +176,27 @@ while True:
         print(d.battery, file=sys.stderr, flush=True)
 
         if d.y == SURFACE_Y and turn_counter == 1:
-            target_x_changed = 0
+            d.target_x_changed = 0
             if d.role == "lefty":
-                target_x = 2000
-                target_y = 4500
+                d.target_x = 2000
+                d.target_y = 4500
             else:
-                target_x = 8000
-                target_y = 8750
+                d.target_x = 8000
+                d.target_y = 8750
 
-        if d.y < target_y:
-            print(f"MOVE {target_x} {target_y} {light(d, target_y)}")
+        if d.y < d.target_y:
+            print(f"MOVE {d.target_x} {d.target_y} {light(d)}")
 
-        elif d.y == target_y:
-            if d.x == target_x:
-                if target_x_changed == 0:
-                    target_x = 2000 if target_x == 8000 else 8000
-                    target_x_changed = 1
+        elif d.y == d.target_y:
+            if d.x == d.target_x:
+                if d.target_x_changed == 0:
+                    d.target_x = 2000 if d.target_x == 8000 else 8000
+                    d.target_x_changed = 1
                 else:
-                    target_x_changed = 0
-                    target_y = SURFACE_Y
-            print(f"MOVE {target_x} {target_y} {light(d, target_y)}")
-        elif d.y > target_y:
-            print(f"MOVE {target_x} {target_y} 0")
+                    d.target_x_changed = 0
+                    d.target_y = SURFACE_Y
+            print(f"MOVE {d.target_x} {d.target_y} {light(d)}")
+        elif d.y > d.target_y:
+            print(f"MOVE {d.target_x} {d.target_y} 0")
         else:
-            print("WAIT 1")
+            print("WAIT 1 ok")
