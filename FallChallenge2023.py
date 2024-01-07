@@ -34,6 +34,7 @@ class Drone:
         self.battery = battery
         self.blips = {}
         self.currentScans = []
+        self.role = ""
 
     def __str__(self):
         return f'ID:{self.drone_id}, ({self.x}, {self.y}), E:{emergency}, B:{self.battery}'
@@ -70,7 +71,7 @@ def creatures_in_big_light(d, target_x, target_y):
 
 def light(d, target_y):
     if target_y<8000 or d.y > 5000:
-        return "1" if turn_counter % 3 else "0"
+        return "1" if not turn_counter % 3 else "0"
     else:
         return "0"
 
@@ -123,12 +124,17 @@ while True:
         creature_id = int(input())
         foe_scanned_creatures[creature_id] = creatures[creature_id]
 
+    all_drones = []
     my_drone_count = int(input())
     my_drones = {}
     for i in range(my_drone_count):
         drone_id, drone_x, drone_y, emergency, battery = [int(j) for j in input().split()]
         drone = Drone(drone_id, drone_x, drone_y, emergency, battery)
         my_drones[drone_id] = drone
+        all_drones[drone_id] = drone
+    if turn_counter == 1:
+        for d in my_drones.values():
+            d.role = "righty" if d.x == max([dr.x for dr in my_drones.values()]) else "lefty" # Drone with higher x goes right
 
     foe_drone_count = int(input())
     foe_drones = {}
@@ -136,6 +142,7 @@ while True:
         drone_id, drone_x, drone_y, emergency, battery = [int(j) for j in input().split()]
         drone = Drone(drone_id, drone_x, drone_y, emergency, battery)
         foe_drones[drone_id] = drone
+        all_drones[drone_id] = drone
 
     drone_scan_count = int(input()) # Scans currently within a drone
     for i in range(drone_scan_count):
@@ -161,19 +168,20 @@ while True:
         my_drones[drone_id].add_blip(creature_id, radar)
 
     for d in my_drones.values():
-
-        # Write an action using print
-        # To debug: print("Debug messages...", file=sys.stderr, flush=True)
-        # MOVE <x> <y> <light (1|0)> | WAIT <light (1|0)>
         print(d.battery, file=sys.stderr, flush=True)
 
-        if d.y == SURFACE_Y:    # Starting y
+        if d.y == SURFACE_Y and turn_counter == 1:
             target_x_changed = 0
-            target_x = 2000 if d.x < 5000 else 8000
-            target_y = 4500 if my_scan_count == 0 else 8750
+            if d.role == "lefty":
+                target_x = 2000
+                target_y = 4500
+            else:
+                target_x = 8000
+                target_y = 8750
 
         if d.y < target_y:
             print(f"MOVE {target_x} {target_y} {light(d, target_y)}")
+
         elif d.y == target_y:
             if d.x == target_x:
                 if target_x_changed == 0:
