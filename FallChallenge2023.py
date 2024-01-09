@@ -51,30 +51,38 @@ class Drone:
         self.current_scans.append(creature_id)
 
 
-def creatures_in_big_light(d, target_x, target_y):
+def monsters_nearby_next_turn(d):
 
-    if target_x == -1 and target_y == -1:
+    if d.target_x == -1 and d.target_y == -1:
         future_x = d.x
         future_y = d.y-SINKING_IF_MOTOR_OFF
     else:
-        distance = math.sqrt((d.x - target_x)**2 + (d.y - target_y)**2)
+        distance = math.sqrt((d.x - d.target_x)**2 + (d.y - d.target_y)**2)
         if distance == 0: distance = 1
-        future_x = d.x + (target_x - d.x) * MAX_MOVEMENT/distance
-        future_y = d.y + (target_y - d.y) * MAX_MOVEMENT/distance
-    print(f'Predicted pos: {future_x}, {future_y}', file=sys.stderr, flush=True)
+        future_x = d.x + (d.target_x - d.x) * MAX_MOVEMENT/distance
+        future_y = d.y + (d.target_y - d.y) * MAX_MOVEMENT/distance
+    # print(f'Predicted pos: {future_x}, {future_y}', file=sys.stderr, flush=True)
 
-    for c in visible_creatures.values():
-        distance = math.dist([future_x, future_y], [c.x + c.creature_vx, c.y + c.creature_vy])
-        if c.creature_id not in my_scanned_creatures and SCAN_RANGE < distance <= SCAN_RANGE_WITH_LIGHT:
-            return "1"
-    return "0"
+    monsters = {}
+    for vc in visible_creatures.values():
+        if creatures[vc.creature_id]._type == -1:
+            print(f"M{vc.creature_id} pos: {vc.x} {vc.y} v: {vc.creature_vx} {vc.creature_vy}", file=sys.stderr, flush=True)
+            distance = math.dist([future_x, future_y], [vc.x + vc.creature_vx, vc.y + vc.creature_vy])
+            monsters[vc.creature_id] = distance
+    return monsters
 
 
 def light(d):
-    if d.y > 2000:
-        return "1" if not turn_counter % 4 else "0"
+
+    monster_counter = 0
+    for distance in monsters_nearby_next_turn(d).values():
+        if distance <= 2000:
+            monster_counter += 1
+
+    if d.y < 2000 or turn_counter % 4 or monster_counter:
+        return "0 "+str(monster_counter)
     else:
-        return "0"
+        return "1"
 
 
 def horizontal_target(d, current_target):
@@ -86,9 +94,10 @@ def horizontal_target(d, current_target):
 
 def find_unscanned_fish():
     unscanned = []
-    for creature_id in creatures.keys():
-        if creature_id not in my_scanned_creatures.keys() and len(creatures[creature_id].scanned_by_my_drones) == 0:
-            unscanned.append(creatures[creature_id])
+    for c in creatures.values():
+        if (c._type > -1 and c.creature_id not in my_scanned_creatures.keys()
+                and len(c.scanned_by_my_drones) == 0):
+            unscanned.append(c)
     return unscanned
 
 
@@ -104,9 +113,9 @@ SCAN_RANGE_WITH_LIGHT = 2000
 BATTERY_MAX = 30
 BATTERY_RECHARGE = 1
 BATTERY_DRAIN_WITH_LIGHT = 5
-turn_counter = 0
 
 # Initialization Input
+turn_counter = 0
 creature_count = int(input())
 creatures = {}
 for i in range(creature_count):
@@ -145,10 +154,18 @@ while True:
                 d.role = "righty" if d.x == max([dr.x for dr in my_drones.values()]) else "lefty" # Drone with higher x goes right
         else:
             drone = my_drones[drone_id]
+            monsters_nearby_next_turn(drone)
             drone.x = drone_x
             drone.y = drone_y
             drone.emergency = emergency
             drone.battery = battery
+            if emergency:
+                print(f"Emergency! D{drone_id} lost scans {drone.current_scans}", file=sys.stderr, flush=True)
+                for creature_id in drone.current_scans:
+                    if drone_id in creatures[creature_id].scanned_by_my_drones:
+                        creatures[creature_id].scanned_by_my_drones.remove(drone_id)
+                drone.current_scans = []
+
 
     foe_drone_count = int(input())
     foe_drones = {}
@@ -159,13 +176,18 @@ while True:
         #all_drones[drone_id] = drone
 
     drone_scan_count = int(input()) # Scans currently within a drone
+    for drone in my_drones.values() or foe_drones.values():
+        drone.current_scans = []
+    for creature in creatures.values():
+        creature.scanned_by_my_drones = []
+        creature.scanned_by_foe_drones = []
     for i in range(drone_scan_count):
         drone_id, creature_id = [int(j) for j in input().split()]
         if drone_id in my_drones:
-            my_drones[drone_id].add_scan(creatures[creature_id])
+            my_drones[drone_id].current_scans.append(creature_id)
             creatures[creature_id].scanned_by_my_drones.append(drone_id)
         else:
-            foe_drones[drone_id].add_scan(creatures[creature_id])
+            foe_drones[drone_id].current_scans.append(creature_id)
             creatures[creature_id].scanned_by_foe_drones.append(drone_id)
 
     visible_creature_count = int(input())
