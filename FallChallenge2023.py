@@ -1,5 +1,7 @@
 import sys
 import math
+
+
 # Score points by scanning valuable fish faster than your opponent.
 
 
@@ -52,35 +54,34 @@ class Drone:
 
 
 def monsters_nearby_next_turn(d):
-
     if d.target_x == -1 and d.target_y == -1:
         future_x = d.x
-        future_y = d.y-SINKING_IF_MOTOR_OFF
+        future_y = d.y - SINKING_IF_MOTOR_OFF
     else:
-        distance = math.sqrt((d.x - d.target_x)**2 + (d.y - d.target_y)**2)
+        distance = math.sqrt((d.x - d.target_x) ** 2 + (d.y - d.target_y) ** 2)
         if distance == 0: distance = 1
-        future_x = d.x + (d.target_x - d.x) * MAX_MOVEMENT/distance
-        future_y = d.y + (d.target_y - d.y) * MAX_MOVEMENT/distance
+        future_x = d.x + (d.target_x - d.x) * MAX_MOVEMENT / distance
+        future_y = d.y + (d.target_y - d.y) * MAX_MOVEMENT / distance
     # print(f'Predicted pos: {future_x}, {future_y}', file=sys.stderr, flush=True)
 
     monsters = {}
     for vc in visible_creatures.values():
         if creatures[vc.creature_id]._type == -1:
-            print(f"M{vc.creature_id} pos: {vc.x} {vc.y} v: {vc.creature_vx} {vc.creature_vy}", file=sys.stderr, flush=True)
+            print(f"M{vc.creature_id} pos: {vc.x} {vc.y} v: {vc.creature_vx} {vc.creature_vy}", file=sys.stderr,
+                  flush=True)
             distance = math.dist([future_x, future_y], [vc.x + vc.creature_vx, vc.y + vc.creature_vy])
             monsters[vc.creature_id] = distance
     return monsters
 
 
 def light(d):
-
     monster_counter = 0
     for distance in monsters_nearby_next_turn(d).values():
         if distance <= 2000:
             monster_counter += 1
 
     if d.y < 2000 or turn_counter % 4 or monster_counter:
-        return "0 "+str(monster_counter)
+        return "0 " + str(monster_counter)
     else:
         return "1"
 
@@ -98,7 +99,20 @@ def find_unscanned_fish():
         if (c._type > -1 and c.creature_id not in my_scanned_creatures.keys()
                 and len(c.scanned_by_my_drones) == 0):
             unscanned.append(c)
-    return unscanned
+    # filter extinct
+    extinct = find_extinct_fish(unscanned)
+    return list(filter(lambda i: i not in extinct, unscanned))
+
+
+def find_extinct_fish(unscanned_fish):
+    for f in unscanned_fish:
+        for d in my_drones.values():
+            if f not in fish_out_of_bounds and ((d.x == MAP_MAX_X and "R" in d.blips[f.creature_id]) \
+                    or (d.x == 0 and d.y == MAP_MAX_Y and "BL" in d.blips[f.creature_id])):
+                # x<0 is harder to determine because d.x==f.x shows as "L" in radar
+                fish_out_of_bounds.append(f)
+                print(f"{f.creature_id} extinct", file=sys.stderr, flush=True)
+    return fish_out_of_bounds
 
 
 # Constants
@@ -116,6 +130,7 @@ BATTERY_DRAIN_WITH_LIGHT = 5
 
 # Initialization Input
 turn_counter = 0
+fish_out_of_bounds = []
 creature_count = int(input())
 creatures = {}
 for i in range(creature_count):
@@ -129,7 +144,7 @@ while True:
     my_score = int(input())
     foe_score = int(input())
 
-    my_scan_count = int(input()) # Amount of SAVED scans
+    my_scan_count = int(input())  # Amount of SAVED scans
     my_scanned_creatures = {}
     for i in range(my_scan_count):
         creature_id = int(input())
@@ -151,7 +166,8 @@ while True:
             my_drones[drone_id] = drone
             # all_drones[drone_id] = drone
             for d in my_drones.values():
-                d.role = "righty" if d.x == max([dr.x for dr in my_drones.values()]) else "lefty" # Drone with higher x goes right
+                d.role = "righty" if d.x == max(
+                    [dr.x for dr in my_drones.values()]) else "lefty"  # Drone with higher x goes right
         else:
             drone = my_drones[drone_id]
             monsters_nearby_next_turn(drone)
@@ -166,16 +182,15 @@ while True:
                         creatures[creature_id].scanned_by_my_drones.remove(drone_id)
                 drone.current_scans = []
 
-
     foe_drone_count = int(input())
     foe_drones = {}
     for i in range(foe_drone_count):
         drone_id, drone_x, drone_y, emergency, battery = [int(j) for j in input().split()]
         drone = Drone(drone_id, drone_x, drone_y, emergency, battery)
         foe_drones[drone_id] = drone
-        #all_drones[drone_id] = drone
+        # all_drones[drone_id] = drone
 
-    drone_scan_count = int(input()) # Scans currently within a drone
+    drone_scan_count = int(input())  # Scans currently within a drone
     for drone in my_drones.values() or foe_drones.values():
         drone.current_scans = []
     for creature in creatures.values():
@@ -211,7 +226,6 @@ while True:
         if d.y == SURFACE_Y:
             if turn_counter == 1:
                 d.target_x_changed = 0
-                hunted_creatures = []
                 if d.role == "lefty":
                     d.target_x = 2000
                     d.target_y = 4500
@@ -220,10 +234,8 @@ while True:
                     d.target_y = 8750
             else:
                 d.currentScans = []
-                hunted_blips = []
                 if my_scan_count < 12:
-                    hunted_fish = find_unscanned_fish()
-                    if hunted_fish:
+                    if find_unscanned_fish():
                         d.role = "hunting"
         if d.role == "hunting":
             hunted_fish = find_unscanned_fish()
