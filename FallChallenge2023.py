@@ -36,11 +36,6 @@ class VisibleCreature:
         return math.sqrt((drone.x + future_x - self.x + self.creature_vx) ** 2
                          + (drone.y + future_y - self.y + self.creature_vy) ** 2)
 
-    def closest_distance_during_turn(self, drone):
-        min_distance = 9999
-            # TODO
-        return min_distance
-
 
 class Drone:
     def __init__(self, drone_id, drone_x, drone_y, emergency, battery):
@@ -79,10 +74,11 @@ class Drone:
                 future_y = self.y + (self.target_y - self.y) * MAX_MOVEMENT / distance
         return future_x, future_y
 
+
 def path_during_turn(current_x, current_y, future_x, future_y):
     path = []
     for i in range(10):
-        path[i] = (current_x + (future_x - current_x) * i / 9, current_y + (future_y - current_y) * i / 9)
+        path.append((current_x + (future_x - current_x) * i / 9, current_y + (future_y - current_y) * i / 9))
     return path
 
 
@@ -104,27 +100,45 @@ def monsters_by_distance_nearby(d):
     for vc in visible_creatures.values():
         if creatures[vc.creature_id]._type == -1:
             distance = math.dist([d.x, d.y], [vc.x, vc.y])
-            monsters[vc.creature_id] = distance
+            if distance <= 2000:
+                monsters[vc.creature_id] = distance
     return dict(sorted(monsters.items(), key=lambda x: x[1]))  # Sorted by distance ascending
+
+
+def is_path_safe(d, future_x, future_y):
+    if monsters_by_distance_nearby(d):
+        my_path = path_during_turn(d.x, d.y, future_x, future_y)
+        for m_id in monsters_by_distance_nearby(d).keys():
+            monster = visible_creatures[m_id]
+            monster_path = path_during_turn(monster.x, monster.y, monster.x + monster.creature_vx, monster.y + monster.creature_vy)
+            for i in range(10):
+                if math.dist(my_path[i], monster_path[i]) < 550:
+                    print(f"Abort path to {future_x, future_y} - M{m_id} would hit D{d.drone_id} at {my_path[i]}!",
+                          file=sys.stderr, flush=True)
+                    return False
+    return True
 
 
 def move_safely(d):
     future_x, future_y = d.position_end_of_turn()
-    my_path = path_during_turn(d.x, d.y, future_x, future_y)
-    for m_id in monsters_by_distance_nearby(d).keys():
-        monster = visible_creatures[m_id]
 
-
-    # TODO: Find a safe path for drone d to move to without crossing paths with monsters. The current position is d.x, d.y and
-    # within this turn the drone will move to future_x, future_y, following the coordinates in my_path. We need to check
-    # if any of the monsters's movement paths will intersect with my_path. If so, we need to find a new path for d.
-    # The function returns the new target position as a string "x y".
-
-
-
-
-
-
+    if is_path_safe(d, future_x, future_y):
+        return f"{d.target_x} {d.target_y}"
+    else:
+        # Find a new path by adjusting the angle of movement by 10 degrees, checking both clockwise and counter-clockwise
+        # until a safe path is found.
+        num = (list(range(1, 19)) + list(range(-1, -19, -1))) # 1, -1, 2, -2 etc to 18, -18, covers 360 degrees
+        num.sort(key=abs)
+        for i in num:
+            angle = math.atan2(future_y - d.y, future_x - d.x)
+            new_angle = angle + math.radians(i * 10)
+            future_x = round(d.x + math.cos(new_angle) * MAX_MOVEMENT)
+            future_y = round(d.y + math.sin(new_angle) * MAX_MOVEMENT)
+            if is_path_safe(d, future_x, future_y):
+                break
+        print(f"Adjusted path to {future_x, future_y}", file=sys.stderr, flush=True)
+        return f"{future_x} {future_y}"
+    
 
 def light(d):
     monster_counter = 0
@@ -217,8 +231,8 @@ while True:
             drone = Drone(drone_id, drone_x, drone_y, emergency, battery)
             my_drones[drone_id] = drone
             # all_drones[drone_id] = drone
-            for self in my_drones.values():
-                self.role = "righty" if self.x == max(
+            for d in my_drones.values():
+                d.role = "righty" if d.x == max(
                     [dr.x for dr in my_drones.values()]) else "lefty"  # Drone with higher x goes right
         else:
             drone = my_drones[drone_id]
@@ -272,37 +286,37 @@ while True:
         radar = inputs[2]
         my_drones[drone_id].add_blip(creature_id, radar)
 
-    for self in my_drones.values():
-        print(self.battery, file=sys.stderr, flush=True)
+    for d in my_drones.values():
+        print(d.battery, file=sys.stderr, flush=True)
 
-        if self.y == SURFACE_Y:
+        if d.y == SURFACE_Y:
             if turn_counter == 1:
-                self.target_x_changed = 0
-                if self.role == "lefty":
-                    self.target_x = 2000
-                    self.target_y = 4500
+                d.target_x_changed = 0
+                if d.role == "lefty":
+                    d.target_x = 2000
+                    d.target_y = 4500
                 else:
-                    self.target_x = 8000
-                    self.target_y = 8250
+                    d.target_x = 8000
+                    d.target_y = 8250
             else:
-                self.currentScans = []
+                d.currentScans = []
                 if my_scan_count < 12:
                     if find_unscanned_fish():
-                        self.role = "hunting"
-        if self.role == "hunting":
+                        d.role = "hunting"
+        if d.role == "hunting":
             hunted_fish = find_unscanned_fish()
             if hunted_fish:
                 prey = hunted_fish[0]
-                self.target_y = self.y + 600 if "B" in self.blips[prey.creature_id] else self.y - 600
-                self.target_x = self.x + 600 if "R" in self.blips[prey.creature_id] else self.x - 600
+                d.target_y = d.y + 600 if "B" in d.blips[prey.creature_id] else d.y - 600
+                d.target_x = d.x + 600 if "R" in d.blips[prey.creature_id] else d.x - 600
             else:
-                self.role == "done :)" # TODO: scare fish out of bounds for enemies
-        if self.y == self.target_y and self.x == self.target_x:
-            if self.target_x_changed == 0:
-                self.target_x = 2000 if self.target_x == 8000 else 8000
-                self.target_x_changed = 1
+                d.role == "done :)" # TODO: scare fish out of bounds for enemies
+        if d.y == d.target_y and d.x == d.target_x:
+            if d.target_x_changed == 0:
+                d.target_x = 2000 if d.target_x == 8000 else 8000
+                d.target_x_changed = 1
             else:
-                self.target_x_changed = 0
-                self.target_y = SURFACE_Y
+                d.target_x_changed = 0
+                d.target_y = SURFACE_Y
 
-        print(f"MOVE {move_safely(self)} {light(self)}")
+        print(f"MOVE {move_safely(d)} {light(d)}")
