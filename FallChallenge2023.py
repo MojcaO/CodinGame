@@ -120,7 +120,7 @@ def is_path_safe(d, future_x, future_y):
             monster = visible_creatures[m_id]
             monster_path = path_during_turn(monster.x, monster.y, monster.x + monster.creature_vx, monster.y + monster.creature_vy)
             for i in range(10):
-                if math.dist(my_path[i], monster_path[i]) < 550:
+                if math.dist(my_path[i], monster_path[i]) < 525:
                     print(f"Abort path to {future_x, future_y} - M{m_id} would hit D{d.drone_id} at {my_path[i]}!",
                           file=sys.stderr, flush=True)
                     return False
@@ -130,7 +130,7 @@ def is_path_safe(d, future_x, future_y):
 def move_safely(d):
     future_x, future_y = d.position_end_of_turn()
 
-    if is_path_safe(d, future_x, future_y):
+    if is_path_safe(d, future_x, future_y) or d.emergency:
         return f"{d.target_x} {d.target_y}"
     else:
         # Find a new path by adjusting the angle of movement by 10 degrees, checking both clockwise and counter-clockwise
@@ -140,11 +140,14 @@ def move_safely(d):
         for i in num:
             angle = math.atan2(future_y - d.y, future_x - d.x)
             new_angle = angle + math.radians(i * 10)
-            future_x = round(d.x + math.cos(new_angle) * MAX_MOVEMENT)
-            future_y = round(d.y + math.sin(new_angle) * MAX_MOVEMENT)
-            if is_path_safe(d, future_x, future_y):
+            new_future_x = round(d.x + math.cos(new_angle) * MAX_MOVEMENT)
+            new_future_y = round(d.y + math.sin(new_angle) * MAX_MOVEMENT)
+            if is_path_safe(d, new_future_x, new_future_y):
+                future_x = new_future_x
+                future_y = new_future_y
+                print(f"Adjusted path to {future_x, future_y}", file=sys.stderr, flush=True)
                 break
-        print(f"Adjusted path to {future_x, future_y}", file=sys.stderr, flush=True)
+        #print(f"No safe path for D{d.drone_id} :(", file=sys.stderr, flush=True)
         return f"{future_x} {future_y}"
     
 
@@ -320,7 +323,8 @@ while True:
                 d.target_x = d.x + 600 if "R" in d.blips[prey.creature_id] else d.x - 600
             else:
                 d.role == "done :)" # TODO: scare fish out of bounds for enemies
-        if d.y == d.target_y and d.x == d.target_x:
+
+        if d.y > 2500 and abs(d.y - d.target_y) < 500 and abs(d.x - d.target_x) < 500:
             if d.target_x_changed == 0:
                 d.target_x = 2000 if d.target_x == 8000 else 8000
                 d.target_x_changed = 1
