@@ -72,6 +72,14 @@ class Drone:
             else:
                 future_x = self.x + (self.target_x - self.x) * MAX_MOVEMENT / distance
                 future_y = self.y + (self.target_y - self.y) * MAX_MOVEMENT / distance
+        if future_y > MAP_MAX_Y:
+            future_y = MAP_MAX_Y
+        elif future_y < 0:
+            future_y = 0
+        if future_x > MAP_MAX_X:
+            future_x = MAP_MAX_X
+        elif future_x < 0:
+            future_x = 0
         return future_x, future_y
 
 
@@ -173,8 +181,9 @@ def find_unscanned_fish():
 def find_extinct_fish(unscanned_fish):
     for f in unscanned_fish:
         for d in my_drones.values():
-            if f not in fish_out_of_bounds and ((d.x == MAP_MAX_X and "R" in d.blips[f.creature_id]) \
-                    or (d.x == 0 and d.y == MAP_MAX_Y and "BL" in d.blips[f.creature_id])):
+            if f not in fish_out_of_bounds and ((d.x == MAP_MAX_X and "R" in d.blips[f.creature_id])
+                                                or (d.y == MAP_MAX_Y and "B" in d.blips[f.creature_id])
+                                                or (d.y < 2500 and "T" in d.blips[f.creature_id])):
                 # x<0 is harder to determine because d.x==f.x shows as "L" in radar
                 fish_out_of_bounds.append(f)
                 print(f"{f.creature_id} extinct", file=sys.stderr, flush=True)
