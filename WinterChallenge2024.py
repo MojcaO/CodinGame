@@ -18,9 +18,11 @@ Next entityCount lines: the following 7 inputs for each entity:
     - type:
         WALL for a wall
         ROOT for a ROOT type organ
-        BASIC for a BASIC type organ
-        HARVESTER for a HARVESTER type organ
-        A for an A protein source
+        BASIC for a BASIC type organ. Requires 1 A protein.
+        HARVESTER for a HARVESTER type organ. Requires 1 C and 1 D protein.
+        TENTACLE for a TENTACLE type organ. Requires 1 B and 1 C protein.
+        SPORER for a SPORER type organ. Requires 1 B and 1 D protein to grow and 1 of each to spawn new ROOT.
+        A/B/C/D for A/B/C/D protein sources
     - owner:
         1 if you are the owner of this organ
         0 if your opponent owns this organ
@@ -200,12 +202,22 @@ while True:
         # Wood League Logic
         ## Wood 4: if the tile on the right side of the map of my Root entity is empty, go there.
         ## Wood 3: go to the closest protein source A and make a harvester next to it, then grow around.
+        ## Wood 2: grid is 1,2 (self) -> 16,5 (enemy). Go to middle X then down/right tentacles.
         my_root = my_entities[0]
         my_last = my_entities[len(my_entities) - 1]
-        closest_a = proteins[0]
+        #closest_a = proteins[0] # No protein sources in Wood 2
+        if len(my_entities) < 8:
+            print(f"GROW {my_last.organ_id} {my_last.x + 1} {my_root.y} BASIC")
+        elif len(my_entities) == 8:
+            print(f"GROW {my_last.organ_id} {my_last.x + 1} {my_last.y} TENTACLE E")
+        elif my_last.y == 5:
+            print(f"GROW {my_last.organ_id} {my_last.x + 1} {my_last.y} TENTACLE E")
+        else:
+            print(f"GROW {my_last.organ_id} {my_last.x + 1} {my_last.y + 1} TENTACLE E")
 
-        #if (myRoot.x, 16) not in grid.keys() or grid[(myRoot.x, 16)].owner == -1:
-        if not closest_a.harvested_by(grid)[0]:
+
+        #W4: if (myRoot.x, 16) not in grid.keys() or grid[(myRoot.x, 16)].owner == -1:
+        '''W3: if not closest_a.harvested_by(grid)[0]:
             my_closest, distance, target_direction = closest_a.closest_by_taxicab(my_entities)
 
             if distance > 2:
@@ -226,4 +238,4 @@ while True:
                 print(f"GROW {my_last.organ_id} {16} {my_last.y} BASIC going")
 
             else:
-                print(f"GROW {my_last.organ_id} {10} {6} BASIC going down")
+                print(f"GROW {my_last.organ_id} {10} {6} BASIC going down")'''
