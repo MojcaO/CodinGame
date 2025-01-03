@@ -199,13 +199,33 @@ while True:
         # Write an action using print, example: "GROW id x y type"
         # To debug: print("Debug messages...", file=sys.stderr, flush=True)
 
+        my_root = my_entities[0]
+        my_last = my_entities[len(my_entities) - 1]
+        closest_a = proteins[0]
+
         # Wood League Logic
         ## Wood 4: if the tile on the right side of the map of my Root entity is empty, go there.
         ## Wood 3: go to the closest protein source A and make a harvester next to it, then grow around.
         ## Wood 2: grid is 1,2 (self) -> 16,5 (enemy). Go to middle X then down/right tentacles.
-        my_root = my_entities[0]
-        my_last = my_entities[len(my_entities) - 1]
-        #closest_a = proteins[0] # No protein sources in Wood 2
+        ## Wood 1: shoot spore next to protein source (not on), grow down, tentacle south. MUST "wait" on entities that can't act.
+
+        if required_actions_count == 1:
+            if my_last._type == 'ROOT':
+                print(f"GROW {my_last.organ_id} {my_last.x + 1} {my_root.y} SPORER E")
+            else:
+                print(f"SPORE {my_last.organ_id} 16 {my_last.y}")
+        elif len(my_entities) & 1:
+            if len(my_entities) < 3:
+                print(f"GROW {my_last.organ_id} {my_last.x} {my_root.y + 1} TENTACLE S attack!")
+            elif len(my_entities) < 5:
+                print(f"GROW {my_last.organ_id} {my_last.x} {my_root.y - 1} HARVESTER N nom!")
+
+        else:
+            print(f"GROW {my_root} {my_last.x+1} {my_root.y + 1} BASIC ok")
+
+
+
+        '''
         if len(my_entities) < 8:
             print(f"GROW {my_last.organ_id} {my_last.x + 1} {my_root.y} BASIC")
         elif len(my_entities) == 8:
@@ -213,7 +233,7 @@ while True:
         elif my_last.y == 5:
             print(f"GROW {my_last.organ_id} {my_last.x + 1} {my_last.y} TENTACLE E")
         else:
-            print(f"GROW {my_last.organ_id} {my_last.x + 1} {my_last.y + 1} TENTACLE E")
+            print(f"GROW {my_last.organ_id} {my_last.x + 1} {my_last.y + 1} TENTACLE E")'''
 
 
         #W4: if (myRoot.x, 16) not in grid.keys() or grid[(myRoot.x, 16)].owner == -1:
